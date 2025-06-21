@@ -1,36 +1,53 @@
+# rag_qa.py
+
 import faiss
-import numpy as np
 import pandas as pd
 from sentence_transformers import SentenceTransformer
-import requests
+from transformers import AutoTokenizer, AutoModelForCausalLM
+import torch
+import os
 
-# 加载数据和模型
-df = pd.read_csv("data/douban_cleaned.csv")
-model = SentenceTransformer("shibing624/text2vec-base-multilingual")
-index = faiss.read_index("faiss_index.index")
+# 设置路径
+INDEX_PATH = "vector_index/faiss.index"
+CSV_PATH = "vector_index/gzxb_cleaned.csv"
 
-def search_similar(question, top_k=3):
-    question_vec = model.encode([question])
-    D, I = index.search(np.array(question_vec), top_k)
-    return [df.iloc[i]["text"] for i in I[0]]
+# 加载评论文本
+df = pd.read_csv(CSV_PATH)
+corpus = df["comment"].tolist()
 
-def call_llama(context, question):
-    url = "https://openrouter.ai/api/v1/chat/completions"
-    headers = {
-        "Authorization": "Bearer your_llama_api_key",
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "model": "meta-llama/llama-3-8b-instruct",
-        "messages": [
-            {"role": "system", "content": "你是一个中文评论分析专家。"},
-            {"role": "user", "content": f"请根据以下评论回答问题：\n{context}\n问题：{question}"}
-        ]
-    }
-    response = requests.post(url, headers=headers, json=payload)
-    return response.json()["choices"][0]["message"]["content"]
+# 加载向量索引
+index = faiss.read_index(INDEX_PATH)
 
-def rag_answer(question):
-    docs = search_similar(question)
-    context = "\n".join(docs)
-    return call_llama(context, question)
+# 加载 embedding 模型（和 preprocess.py 中一致）
+embed_model = SentenceTransformer("shibing624/text2vec-base-chinese")
+
+# 加载本地或 API 的 LLM —— 这里假设你使用 HuggingFace 本地模型（可替换为 OpenAI/LLaMA）
+# 你可以替换为 openai.ChatCompletion API
+tokenizer = AutoTokenizer.from_pretrained("IDEA-CCNL/Randeng-Pegasus-238M-Chinese", trust_remote_code=True)
+model = AutoModelForCausalLM.from_pretrained("IDEA-CCNL/Randeng-Pegasus-238M-Chinese", trust_remote_code=True)
+
+# 获取用户输入
+query = input("请输入你的问题：")
+
+# 编码问题为向量
+query_vec = embed_model.encode([query])
+query_vec = query_vec.astype("float32")
+
+# 检索相似评论
+top_k = 3
+scores, indices = index.search(query_vec, top_k)
+
+# 取出最相关的文本
+retrieved = [corpus[i] for i in indices[0]]
+context = "\n".join(retrieved)
+
+# 拼接提示词
+prompt = f"以下是一些与问题相关的评论：\n{context}\n\n请根据这些内容回答问题：{query}"
+
+# 构造输入
+inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=1024)
+outputs = model.generate(**inputs, max_new_tokens=150)
+answer = tokenizer.decode(outputs[0], skip_special_tokens=True)
+
+print("\n🧠 回答：")
+print(answer)

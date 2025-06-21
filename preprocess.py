@@ -1,26 +1,37 @@
 import pandas as pd
-import re
+import numpy as np
+from sentence_transformers import SentenceTransformer
+import faiss
+from tqdm import tqdm
+import os
 
-# 1. 读取原始 CSV 文件（请根据你的路径调整）
-df = pd.read_csv("data/bilibili_gzxb.csv")
+# 1. 加载清洗后的中文评论数据
+df = pd.read_csv("data/gzxb_cleaned.csv")
 
-# 2. 清洗函数
-def clean_text(text):
-    if not isinstance(text, str):
-        return ""
-    text = re.sub(r"<.*?>", "", text)  # 去除 HTML 标签
-    text = re.sub(r"[^\u4e00-\u9fa5a-zA-Z0-9\s]", "", text)  # 去除特殊字符、标点、emoji
-    return text.strip()
+# 2. 过滤无效文本（太短的评论、缺失）
+df = df.dropna(subset=["clean_text"])
+df = df[df["clean_text"].str.len() >= 5].drop_duplicates(subset=["clean_text"]).reset_index(drop=True)
 
-# 3. 清洗评论字段
-df_cleaned = df[["comment"]].copy()
-df_cleaned["clean_text"] = df_cleaned["comment"].map(clean_text)
+# 3. 加载中文向量模型（CPU 也能跑，推荐模型）
+print("🔄 正在加载中文向量模型...")
+model = SentenceTransformer("shibing624/text2vec-base-multilingual")
 
-# 4. 可选：去除过短的文本（如少于5字）
-df_cleaned = df_cleaned[df_cleaned["clean_text"].str.len() >= 5]
+# 4. 批量将文本转为向量（向量维度为 768）
+print("🔄 正在将文本向量化...")
+sentences = df["clean_text"].tolist()
+embeddings = model.encode(sentences, show_progress_bar=True)
 
-# 5. 保存为新 CSV 文件
-df_cleaned.to_csv("data/gzxb_cleaned.csv", index=False)
-df_cleaned[["comment"]].to_csv("data/gzxb_raw.csv", index=False)
+# 5. 使用 FAISS 创建索引并保存
+dimension = embeddings.shape[1]
+index = faiss.IndexFlatL2(dimension)
+index.add(np.array(embeddings))
 
-print("✅ 清洗完成，已保存为 gzxb_cleaned.csv 和 gzxb_raw.csv")
+# 创建保存目录
+os.makedirs("vector_index", exist_ok=True)
+
+# 保存索引文件和原始文本索引映射
+faiss.write_index(index, "vector_index/faiss_index.index")
+df.iloc[:len(sentences)].to_csv("vector_index/faiss_docs.csv", index=False)
+
+print(f"✅ 向量数量: {len(sentences)}，索引已保存至 vector_index/")
+
