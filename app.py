@@ -6,7 +6,7 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
 
 # 页面标题
-st.title("🎯 中文 RAG 评论问答机器人")
+st.title(" 中文 RAG 评论问答机器人")
 
 # 加载数据
 @st.cache_resource
@@ -27,7 +27,7 @@ corpus, index, embed_model, tokenizer, model = load_resources()
 query = st.text_input("请输入你的问题：")
 
 if query:
-    with st.spinner("🔍 检索中..."):
+    with st.spinner(" 检索中..."):
         # 向量化
         query_vec = embed_model.encode([query]).astype("float32")
         scores, indices = index.search(query_vec, 3)
@@ -45,5 +45,5 @@ if query:
         )
 
         answer = tokenizer.decode(outputs[0], skip_special_tokens=True)
-        st.markdown("### 🤖 回答：")
+        st.markdown("###  回答：")
         st.success(answer)

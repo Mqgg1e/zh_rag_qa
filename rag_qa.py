@@ -60,9 +60,9 @@ tokens = outputs[0].tolist()
 text = "".join([tokenizer.decode([t]) for t in tokens if t not in tokenizer.all_special_ids])
 print("模型输出拼接后:", text)
 
-print("\n🧠 回答：")
+print("\n 回答：")
 
 answer = tokenizer.decode(outputs[0], skip_special_tokens=True)
 print([tokenizer.decode([token]) for token in outputs[0][:20]])
-print("\n🧠 回答：")
+print("\n 回答：")
 print(answer)

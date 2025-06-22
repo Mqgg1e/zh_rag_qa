@@ -30,11 +30,11 @@ df = df[~df["clean_text"].str.contains(r"^(?:[赞好评\d\s【】\[\]（）])+?$
 df["clean_text"] = df["clean_text"].apply(clean_text)
 
 # 3. 加载中文向量模型（CPU 也能跑，推荐模型）
-print("🔄 正在加载中文向量模型...")
+print(" 正在加载中文向量模型...")
 model = SentenceTransformer("shibing624/text2vec-base-multilingual")
 
 # 4. 批量将文本转为向量（向量维度为 768）
-print("🔄 正在将文本向量化...")
+print(" 正在将文本向量化...")
 sentences = df["clean_text"].tolist()
 embeddings = model.encode(sentences, show_progress_bar=True)
 
@@ -50,4 +50,4 @@ os.makedirs("vector_index", exist_ok=True)
 faiss.write_index(index, "vector_index/faiss_index.index")
 df.iloc[:len(sentences)].to_csv("vector_index/faiss_docs.csv", index=False)
 
-print(f"✅ 向量数量: {len(sentences)}，索引已保存至 vector_index/")
+print(f" 向量数量: {len(sentences)}，索引已保存至 vector_index/")
