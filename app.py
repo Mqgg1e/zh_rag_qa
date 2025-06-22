@@ -5,6 +5,7 @@ from sentence_transformers import SentenceTransformer
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
 
+device = "cuda" if torch.cuda.is_available() else "cpu"
 # 页面标题
 st.title(" 中文 RAG 评论问答机器人")
 
@@ -15,9 +16,9 @@ def load_resources():
     corpus = df["clean_text"].tolist()
 
     index = faiss.read_index("vector_index/faiss_index.index")
-    embed_model = SentenceTransformer("shibing624/text2vec-base-multilingual")
-    tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen1.5-0.5B-Chat", trust_remote_code=True)
-    model = AutoModelForCausalLM.from_pretrained("Qwen/Qwen1.5-0.5B-Chat", trust_remote_code=True).eval()
+    embed_model = SentenceTransformer("BAAI/bge-large-zh-v1.5",device=device)
+    tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen1.5-7B-Chat", trust_remote_code=True)
+    model = AutoModelForCausalLM.from_pretrained("Qwen/Qwen1.5-7B-Chat", trust_remote_code=True).to(device).eval()
 
     return corpus, index, embed_model, tokenizer, model
 
@@ -35,7 +36,7 @@ if query:
 
         prompt = f"根据以下评论内容，简洁回答问题：{query}\n评论内容：\n{context}"
         inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=1024)
-
+        inputs = {k: v.to(device) for k, v in inputs.items()}
         outputs = model.generate(
             **inputs,
             max_new_tokens=150,

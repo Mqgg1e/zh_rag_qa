@@ -5,6 +5,10 @@ import faiss
 from tqdm import tqdm
 import os
 import re
+import torch
+
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
 
 # 1. 加载清洗后的中文评论数据
 df = pd.read_csv("data/gzxb_cleaned.csv")
@@ -31,7 +35,7 @@ df["clean_text"] = df["clean_text"].apply(clean_text)
 
 # 3. 加载中文向量模型（CPU 也能跑，推荐模型）
 print(" 正在加载中文向量模型...")
-model = SentenceTransformer("shibing624/text2vec-base-multilingual")
+model = SentenceTransformer("BAAI/bge-large-zh-v1.5",device=device)
 
 # 4. 批量将文本转为向量（向量维度为 768）
 print(" 正在将文本向量化...")
